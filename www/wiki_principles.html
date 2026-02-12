@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Principles of msCNVS</title>
+
+  <!-- MathJax for LaTeX formulas -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 0;
+      color: #222;
+      line-height: 1.6;
+    }
+    header {
+      background: #1f4e79;
+      color: white;
+      padding: 24px 40px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+    main {
+      max-width: 960px;
+      margin: 30px auto;
+      background: white;
+      padding: 30px 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    h2 {
+      border-left: 4px solid #1f4e79;
+      padding-left: 10px;
+      margin-top: 32px;
+      font-size: 22px;
+    }
+    h3 {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #333;
+    }
+    p, li {
+      font-size: 15px;
+    }
+    ul {
+      margin-left: 20px;
+    }
+    .formula-block {
+      background: #fafafa;
+      border-left: 3px solid #1f4e79;
+      padding: 12px 14px;
+      margin: 14px 0;
+      font-size: 15px;
+    }
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: #777;
+      margin: 40px 0 20px;
+    }
+  </style>
+</head>
+
+<body>
+<header>
+  <h1>Principles of msCNVS</h1>
+  <p>Medium-throughput single-cell CNV sequencing with early barcoding and 2D fitting</p>
+</header>
+
+<main>
+
+  <h2>1. Overview</h2>
+  <p>
+    msCNVS (medium-throughput single-cell CNV sequencing) is a sequencing method designed for
+    clinical-grade single-cell copy number variation (CNV) profiling. It combines early-stage
+    barcoding, Tn5-based tagmentation, and a two-dimensional fitting algorithm (2DFit) to produce
+    accurate absolute CNV profiles without whole-genome pre-amplification (pre-WGA).
+  </p>
+
+  <ul>
+    <li>Early barcoding at the single-cell level</li>
+    <li>No whole-genome amplification (WGA-free)</li>
+    <li>Medium throughput (48–384 cells per run)</li>
+    <li>High uniformity and low bias</li>
+    <li>Accurate ploidy and CN calling via 2D fitting</li>
+  </ul>
+
+  <h2>2. Wet-Lab Principle: Early Barcoding with Modified Tn5</h2>
+
+  <h3>2.1 Tn5 Transposome Design</h3>
+  <p>
+    msCNVS uses a custom Tn5 transposome assembled from:
+  </p>
+  <ul>
+    <li>P5-Tn5 adapter containing an 8 bp cell barcode</li>
+    <li>P7-Tn5 adapter without barcode</li>
+    <li>Mosaic End (ME) sequence enabling Tn5 binding</li>
+  </ul>
+
+  <p>
+    Each single cell is processed in an individual well, where the P5 adapter uniquely labels the
+    cell before pooling. After tagmentation, all wells are combined, and dual indexing (i5/i7)
+    completes the library.
+  </p>
+
+  <h3>2.2 Workflow Summary</h3>
+  <ul>
+    <li>Cell lysis with protease</li>
+    <li>Tagmentation with barcoded Tn5</li>
+    <li>Pooling of all wells</li>
+    <li>PCR with i5/i7 indexes</li>
+    <li>NGS sequencing</li>
+  </ul>
+
+  <h2>3. Computational Principle: From Reads to CNV</h2>
+
+  <h3>3.1 Demultiplexing by Cell Barcode</h3>
+  <p>
+    Each read is assigned to a cell based on its embedded barcode:
+  </p>
+
+  <div class="formula-block">
+    $$\text{cell}(i) = c_k \quad \text{iff} \quad b_i = \text{barcode}(c_k)$$
+  </div>
+
+  <h3>3.2 Genome Binning and Read Counting</h3>
+  <p>
+    The genome is divided into fixed-size bins (e.g., 5k bins ≈ 0.66 Mb/bin).  
+    For cell \(c\) and bin \(j\):
+  </p>
+
+  <div class="formula-block">
+    $$R_{c,j} = \text{number of reads in bin } j$$
+  </div>
+
+  <h3>3.3 Depth Normalization</h3>
+  <p>
+    Let \(T_c = \sum_j R_{c,j}\) be the total reads of cell \(c\).  
+    Normalized read count (NRC):
+  </p>
+
+  <div class="formula-block">
+    $$\text{NRC}_{c,j} = \frac{R_{c,j}}{T_c} \times M$$
+  </div>
+
+  <p>
+    where \(M\) is a constant scaling factor (e.g., mean total reads across cells).
+  </p>
+
+  <h3>3.4 GC Correction</h3>
+  <p>
+    A LOESS curve is fitted to remove GC bias:
+  </p>
+
+  <div class="formula-block">
+    $$\hat{f}(g) = \mathbb{E}[\text{NRC}_{c,j} \mid g_j = g]$$
+    $$\text{NRC}^{GC}_{c,j} = \frac{\text{NRC}_{c,j}}{\hat{f}(g_j)}$$
+  </div>
+
+  <h3>3.5 Standardized Normalized Read Count (SNrc)</h3>
+  <p>
+    SNrc stabilizes variance and centers the signal:
+  </p>
+
+  <div class="formula-block">
+    $$\mu_c = \text{median}_j(\text{NRC}^{GC}_{c,j}), \quad
+      \sigma_c = \text{MAD}_j(\text{NRC}^{GC}_{c,j})$$
+    $$\text{SNrc}_{c,j} = \frac{\text{NRC}^{GC}_{c,j} - \mu_c}{\sigma_c}$$
+  </div>
+
+  <h2>4. Two-Dimensional Fitting (2DFit)</h2>
+
+  <h3>4.1 Joint Estimation of Ploidy and Copy Number</h3>
+  <p>
+    2DFit simultaneously optimizes:
+  </p>
+  <ul>
+    <li>Global ploidy \(P_c\)</li>
+    <li>Integer copy number of each bin \(CN_{c,j}\)</li>
+  </ul>
+
+  <h3>4.2 Objective Function</h3>
+  <p>
+    Let \(\mu(k, P_c)\) be the expected SNrc for copy number \(k\) under ploidy \(P_c\).  
+    The loss function is:
+  </p>
+
+  <div class="formula-block">
+    $$L(P_c, \{CN_{c,j}\}) =
+      \sum_j w_j \left(\text{SNrc}_{c,j} - \mu(CN_{c,j}, P_c)\right)^2
+      + \lambda \sum_j |CN_{c,j} - CN_{c,j-1}|$$
+  </div>
+
+  <p>
+    The second term enforces piecewise-constant CN segments (TV regularization).
+  </p>
+
+  <h3>4.3 Fuzzy Zone</h3>
+  <p>
+    Bins with ambiguous SNrc values fall into a “fuzzy zone,” where CN cannot be confidently
+    assigned. msCNVS explicitly marks these regions to avoid false positives.
+  </p>
+
+  <h2>5. Summary</h2>
+  <ul>
+    <li>msCNVS labels each cell before pooling, enabling WGA-free single-cell CNV sequencing.</li>
+    <li>Normalization, GC correction, and SNrc produce a stable CNV signal.</li>
+    <li>2DFit jointly estimates ploidy and CN, improving accuracy over 1D methods.</li>
+    <li>Validated against CMA, G-banding, and bulk sequencing with high concordance.</li>
+  </ul>
+
+</main>
+
+<footer>
+  msCNVS Principles Documentation Page
+</footer>
+
+</body>
+</html>

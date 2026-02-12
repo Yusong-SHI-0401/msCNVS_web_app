@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Analysis — msCNVS Pipeline</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 0;
+      color: #222;
+      line-height: 1.6;
+    }
+    header {
+      background: #1f4e79;
+      color: white;
+      padding: 24px 40px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+    header p {
+      margin: 6px 0 0;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    main {
+      max-width: 960px;
+      margin: 30px auto;
+      background: white;
+      padding: 30px 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    h2 {
+      border-left: 4px solid #1f4e79;
+      padding-left: 10px;
+      margin-top: 32px;
+      font-size: 22px;
+      color: #1f4e79;
+    }
+    h3 {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #333;
+    }
+    p, li {
+      font-size: 15px;
+    }
+    ul, ol {
+      margin-left: 20px;
+    }
+    .formula-block {
+      background: #fafafa;
+      border-left: 3px solid #1f4e79;
+      padding: 12px 14px;
+      margin: 14px 0;
+      font-size: 15px;
+    }
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: #777;
+      margin: 40px 0 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Analysis Pipeline</h1>
+  <p>How msCNVS processes single-cell CNV data from raw reads to final CNV profiles</p>
+</header>
+
+<main>
+
+  <section>
+    <h2>Overview</h2>
+    <p>
+      The msCNVS analysis pipeline transforms raw single-cell sequencing reads into
+      high-confidence absolute copy number variation (CNV) profiles.  
+      The pipeline is implemented in R and follows a structured sequence of steps:
+    </p>
+
+    <ol>
+      <li>Load genomic bins</li>
+      <li>Mask problematic regions</li>
+      <li>Compute normalized read counts</li>
+      <li>Segment the genome</li>
+      <li>Infer ploidy using 2D fitting</li>
+      <li>Detect CN peaks</li>
+      <li>Generate CNV and peak plots</li>
+    </ol>
+
+    <p>
+      Each step is configurable through the Web App interface, allowing users to fine‑tune
+      analysis parameters for different sample types and sequencing depths.
+    </p>
+  </section>
+
+  <section>
+    <h2>1. LoadBins</h2>
+    <p>
+      The first step divides the genome into fixed-size bins and loads them into memory.
+      These bins serve as the fundamental units for read counting and CNV inference.
+    </p>
+
+    <ul>
+      <li><strong>Resolution</strong>: bin size (e.g., 600 kb)</li>
+      <li><strong>Length</strong>: minimum bin length to retain</li>
+      <li><strong>Genome</strong>: reference genome (hg19 / hg38 / mm10)</li>
+    </ul>
+
+    <p>
+      The read count for cell \( c \) in bin \( j \) is:
+    </p>
+
+    <div class="formula-block">
+      $$R_{c,j} = \text{number of aligned reads in bin } j$$
+    </div>
+  </section>
+
+  <section>
+    <h2>2. MaskBins</h2>
+    <p>
+      Certain genomic regions produce unreliable CNV signals due to repetitive sequences,
+      assembly gaps, or structural complexity.  
+      msCNVS allows masking of these regions before segmentation.
+    </p>
+
+    <ul>
+      <li>centromere</li>
+      <li>clone gaps</li>
+      <li>contigs</li>
+      <li>heterochromatin</li>
+      <li>scaffolds</li>
+      <li>short arms</li>
+    </ul>
+
+    <p>
+      Masked bins are excluded from downstream segmentation and ploidy inference.
+    </p>
+  </section>
+
+  <section>
+    <h2>3. Segmentation</h2>
+    <p>
+      Segmentation identifies genomic regions with consistent copy number states.
+      msCNVS uses a CBS-based approach with tunable sensitivity.
+    </p>
+
+    <ul>
+      <li><strong>alpha</strong>: significance threshold for change‑point detection</li>
+      <li><strong>nperm</strong>: number of permutations</li>
+      <li><strong>undo.SD</strong>: undo threshold for merging segments</li>
+      <li><strong>min.width</strong>: minimum number of bins per segment</li>
+    </ul>
+
+    <p>
+      The segmentation algorithm minimizes:
+    </p>
+
+    <div class="formula-block">
+      $$\sum_j \left( \text{SNrc}_{c,j} - \mu_s \right)^2$$
+    </div>
+
+    <p>
+      where \( \mu_s \) is the mean signal of segment \( s \).
+    </p>
+  </section>
+
+  <section>
+    <h2>4. InferPloidy (2D Fitting)</h2>
+    <p>
+      msCNVS uses a two‑dimensional fitting algorithm to jointly estimate:
+    </p>
+
+    <ul>
+      <li>global ploidy \( P \)</li>
+      <li>segment copy numbers \( CN_s \)</li>
+    </ul>
+
+    <p>
+      Search ranges:
+    </p>
+
+    <ul>
+      <li><strong>m_start → m_end</strong>: slope range</li>
+      <li><strong>b_start → b_end</strong>: intercept range</li>
+      <li><strong>m_step, b_step</strong>: step sizes</li>
+    </ul>
+
+    <p>
+      The objective function:
+    </p>
+
+    <div class="formula-block">
+      $$L(P, CN) = \sum_s w_s \left( \bar{X}_s - \mu(CN_s, P) \right)^2$$
+    </div>
+
+    <p>
+      This identifies the ploidy that best aligns segment means with integer CN states.
+    </p>
+  </section>
+
+  <section>
+    <h2>5. Peak Detection</h2>
+    <p>
+      Peak detection identifies the SNrc peaks corresponding to integer copy numbers.
+    </p>
+
+    <ul>
+      <li><strong>minpeakdistance</strong>: minimum distance between peaks</li>
+    </ul>
+
+    <p>
+      Peaks represent stable CN states such as 1‑copy, 2‑copy, 3‑copy, etc.
+    </p>
+  </section>
+
+  <section>
+    <h2>6. Plotting</h2>
+    <p>
+      The Web App generates two major visual outputs:
+    </p>
+
+    <h3>PlotPeaks</h3>
+    <ul>
+      <li>Width / Height</li>
+      <li>Units (in / cm / px)</li>
+      <li>DPI</li>
+    </ul>
+
+    <h3>PlotCNV</h3>
+    <ul>
+      <li>Genome‑wide CNV profile</li>
+      <li>Segmented CN states</li>
+      <li>Fuzzy zones</li>
+    </ul>
+
+    <p>
+      These plots provide a clear visualization of CNV structure across the genome.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  msCNVS Analysis Pipeline — Documentation Page
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+  function tryRender(){
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          {left: "$$", right: "$$", display: true},
+          {left: "$", right: "$", display: false}
+        ],
+        throwOnError: false,
+        strict: false
+      });
+    } else {
+      setTimeout(tryRender, 150);
+    }
+  }
+  tryRender();
+});
+</script>
+
+</body>
+</html>

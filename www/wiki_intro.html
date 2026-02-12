@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>What is msCNVS — Introduction</title>
+
+  <!-- KaTeX for formulas -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 0;
+      color: #222;
+      line-height: 1.6;
+    }
+    header {
+      background: #1f4e79;
+      color: white;
+      padding: 24px 40px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+    header p {
+      margin: 6px 0 0;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    main {
+      max-width: 960px;
+      margin: 30px auto;
+      background: white;
+      padding: 30px 40px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    h2 {
+      border-left: 4px solid #1f4e79;
+      padding-left: 10px;
+      margin-top: 32px;
+      font-size: 22px;
+      color: #1f4e79;
+    }
+    p, li {
+      font-size: 15px;
+    }
+    ul {
+      margin-left: 20px;
+    }
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: #777;
+      margin: 40px 0 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>What is msCNVS & Sequmed msCNV Web App?</h1>
+  <p>An introduction to the technology and its clinical value</p>
+</header>
+
+<main>
+
+  <section>
+    <h2>Overview</h2>
+    <p>
+      The Sequmed CNV Web App is an online analysis platform built on
+      <strong>msCNVS (medium throughput single-cell CNV sequencing)</strong>.
+      It enables clinical and research users to analyze single-cell copy number variations (CNVs)
+      with high accuracy, low cost, and minimal technical barriers.
+    </p>
+  </section>
+
+  <section>
+    <h2>Core Value of msCNVS</h2>
+    <p>
+      Traditional single-cell CNV sequencing (scCNV-seq) often suffers from high cost,
+      amplification bias, and dependence on specialized instruments.
+      msCNVS overcomes these limitations through three major innovations:
+    </p>
+
+    <ul>
+      <li>
+        <strong>No pre-amplification (preWGA)</strong> —  
+        msCNVS uses a modified Tn5 transposase to directly label single-cell genomes,
+        eliminating the bias introduced by whole-genome amplification.
+      </li>
+
+      <li>
+        <strong>Medium throughput</strong> —  
+        Supports 48–384 single cells per run using standard microplates.
+        With dual indexing, the theoretical upper limit reaches 18,432 uniquely identifiable cells.
+      </li>
+
+      <li>
+        <strong>Low sequencing cost</strong> —  
+        Requires only 1–3 Gb per cell, which is 10–20× less than PTA or MALBAC,
+        making it suitable for routine clinical applications.
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Advantages of the Sequmed msCNV Web App</h2>
+    <ul>
+      <li>
+        <strong>No bioinformatics background required</strong> —  
+        The platform automates the entire workflow, from data upload to CNV visualization.
+      </li>
+
+      <li>
+        <strong>Broad sample compatibility</strong> —  
+        Supports amniotic fluid cells, blastocysts, circulating tumor cells (CTCs),
+        and patient-derived xenograft (PDX) nuclei.
+      </li>
+
+      <li>
+        <strong>High accuracy</strong> —  
+        CNV results show strong concordance with clinical gold standards such as
+        chromosome microarray analysis (CMA) and G-banding karyotyping  
+        (correlation \( R > 0.9 \)).
+      </li>
+    </ul>
+  </section>
+
+</main>
+
+<footer>
+  Sequmed CNV Web App — Powered by msCNVS Technology
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+  function tryRender(){
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          {left: "$$", right: "$$", display: true},
+          {left: "$", right: "$", display: false}
+        ],
+        throwOnError: false,
+        strict: false
+      });
+    } else {
+      setTimeout(tryRender, 150);
+    }
+  }
+  tryRender();
+});
+</script>
+
+</body>
+</html>
