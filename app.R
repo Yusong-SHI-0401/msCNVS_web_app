@@ -1,4 +1,7 @@
 # app.R (完整替换版本)
+#Sys.setenv(http_proxy="http://172.16.196.1:7890")
+#Sys.setenv(https_proxy="http://172.16.196.1:7890")
+#Sys.setenv(all_proxy="socks5://172.16.196.1:7890")
 
 library(DNAcopy)
 library(GenomicAlignments)
@@ -23,7 +26,7 @@ plan(multisession)  # 并发后台任务，按服务器资源调整 workers 参�
 options(shiny.maxRequestSize = 1024 * 1024 * 1024) # 1GB 上限示例，按需调整
 
 # 工作目录与临时目录
-setwd('~/sata/msCNVS_web_app/msCNVS_web_app')
+setwd('~/msCNVS_web_app')
 app_dir <- getwd()
 TEMP_DIR <- file.path(app_dir, "TMP")
 if (!dir.exists(TEMP_DIR)) dir.create(TEMP_DIR, recursive = TRUE, showWarnings = FALSE)
@@ -321,16 +324,19 @@ server <- function(input, output, session) {
                           plot_width_2 = 3.7, plot_height_2 = 0.55, plot_unit_2 = "in", plot_dpi_2 = 300) {
     log_file <- file.path(io_dir, "log.txt")
     tryCatch({
-      writeLines(paste0("[", Sys.time(), "] Starting analysis"), log_file, append = TRUE)
+      
+      cat(paste0("[", Sys.time(), "] Starting analysis\n"), file = log_file, append = TRUE)
       
       file_name <- tools::file_path_sans_ext(basename(zip_path))
       target_dir <- file.path(io_dir, file_name)
       if (!dir.exists(target_dir)) dir.create(target_dir, recursive = TRUE)
       
-      writeLines(paste0("[", Sys.time(), "] Unzipping to ", target_dir), log_file, append = TRUE)
-      unzip(zip_path, exdir = target_dir)
       
-      writeLines(paste0("[", Sys.time(), "] Running CNVision pipeline"), log_file, append = TRUE)
+      cat(paste0("[", Sys.time(), "] Unzipping to\n"), file = log_file, append = TRUE)
+      
+      unzip(zip_path, exdir = target_dir)
+      cat(paste0("[", Sys.time(), "] Running CNVision pipeline\n"), file = log_file, append = TRUE)
+
       a <- CNVision(dir = target_dir)
       b <- LoadBins(a, resolution = resolution, length = length, genome = genome)
       c <- CountRead(b)
@@ -341,10 +347,11 @@ server <- function(input, output, session) {
                        b_start = b_start, b_end = b_end, b_step = b_step)
       cell <- g@config$cells[1]
       
-      writeLines(paste0("[", Sys.time(), "] Detecting peaks"), log_file, append = TRUE)
+
+      cat(paste0("[", Sys.time(), "] Detecting peaks\n"), file = log_file, append = TRUE)
       h <- detect_peaks(g, minpeakdistance = minpeakdistance, plot = TRUE)
       set.seed(123)
-      m <- laplaceMM(h, core_prob = 0.5, dist_type = "normal")
+      m <- laplaceMM(h, core_prob = 0.5, dist_type = "gaussian")
       
       # 保存图像
       p1 <- plotPeaks(m)
@@ -354,11 +361,12 @@ server <- function(input, output, session) {
       p2 <- plotCNV(m, cell = cell, without_x = TRUE)
       cnv_file <- file.path(target_dir, paste0(cell, "_CNV.png"))
       ggsave(cnv_file, plot = p2, width = plot_width_2, height = plot_height_2, units = plot_unit_2, dpi = plot_dpi_2)
+      cat(paste0("[", Sys.time(), "] Analysis finished successfully\n"), file = log_file, append = TRUE)
       
-      writeLines(paste0("[", Sys.time(), "] Analysis finished successfully"), log_file, append = TRUE)
       list(status = "finished", target_dir = target_dir, peaks = peaks_file, cnv = cnv_file, error = NULL)
     }, error = function(e) {
-      writeLines(paste0("[", Sys.time(), "] ERROR: ", e$message), log_file, append = TRUE)
+      cat(paste0("[", Sys.time(), "] ERROR:\n ", e$message), file = log_file, append = TRUE)
+
       list(status = "failed", target_dir = NULL, peaks = NULL, cnv = NULL, error = e$message)
     })
   }
@@ -366,24 +374,65 @@ server <- function(input, output, session) {
   # Run analysis in background using future/promises
   observeEvent(input$run_analysis, {
     req(rv$io_dir, rv$zip_file)
-    io_dir <- rv$io_dir
-    task_json <- file.path(io_dir, "task.json")
+    io_dir_local <- rv$io_dir 
+    zip_file_local <- rv$zip_file
+    task_json <- file.path(io_dir_local, "task.json")
     task_info <- read_json(task_json)
     task_info$status <- "running"
     task_info$time_started <- as.character(Sys.time())
     write_json(task_info, task_json, auto_unbox = TRUE, pretty = TRUE)
-    
-    future({
-      run_segment(zip_path = rv$zip_file, io_dir = io_dir,
-                  resolution = input$resolution, length = input$length, genome = input$genome,
-                  ctypes = input$ctypes, nperm = input$nperm, SD = input$SD,
-                  undo_min_width = input$undo_min_width, alpha = input$alpha,
-                  m_start = input$m_start, m_end = input$m_end, m_step = input$m_step,
-                  b_start = input$b_start, b_end = input$b_end, b_step = input$b_step,
-                  minpeakdistance = input$minpeakdistance,
-                  plot_width = input$plot_width, plot_height = input$plot_height, plot_unit = input$plot_unit, plot_dpi = input$plot_dpi,
-                  plot_width_2 = input$plot_width_2, plot_height_2 = input$plot_height_2, plot_unit_2 = input$plot_unit_2, plot_dpi_2 = input$plot_dpi_2)
-    }) %...>% (function(res) {
+    genome_local <- input$genome
+    resolution_local <- input$resolution
+    length_local <- input$length
+    ctypes_local <- input$ctypes
+    nperm_local <- input$nperm
+    SD_local <- input$SD
+    undo_min_width_local <- input$undo_min_width
+    alpha_local <- input$alpha
+    m_start_local <- input$m_start
+    m_end_local <- input$m_end
+    m_step_local <- input$m_step
+    b_start_local <- input$b_start
+    b_end_local <- input$b_end
+    b_step_local <- input$b_step
+    minpeakdistance_local <- input$minpeakdistance
+    plot_width_local <- input$plot_width
+    plot_height_local <- input$plot_height
+    plot_unit_local <- input$plot_unit
+    plot_dpi_local <- input$plot_dpi
+    plot_width_2_local <- input$plot_width_2
+    plot_height_2_local <- input$plot_height_2
+    plot_unit_2_local <- input$plot_unit_2
+    plot_dpi_2_local <- input$plot_dpi_2
+    future(seed = TRUE, {
+      run_segment(
+        zip_path = zip_file_local,
+        io_dir = io_dir_local,
+        resolution = resolution_local,
+        length = length_local,
+        genome = genome_local,
+        ctypes = ctypes_local,
+        nperm = nperm_local,
+        SD = SD_local,
+        undo_min_width = undo_min_width_local,
+        alpha = alpha_local,
+        m_start = m_start_local,
+        m_end = m_end_local,
+        m_step = m_step_local,
+        b_start = b_start_local,
+        b_end = b_end_local,
+        b_step = b_step_local,
+        minpeakdistance = minpeakdistance_local,
+        plot_width = plot_width_local,
+        plot_height = plot_height_local,
+        plot_unit = plot_unit_local,
+        plot_dpi = plot_dpi_local,
+        plot_width_2 = plot_width_2_local,
+        plot_height_2 = plot_height_2_local,
+        plot_unit_2 = plot_unit_2_local,
+        plot_dpi_2 = plot_dpi_2_local
+      )
+    })    %...>% (function(res) {
       task_info <- read_json(task_json)
       task_info$status <- res$status
       task_info$time_finished <- as.character(Sys.time())
@@ -403,7 +452,7 @@ server <- function(input, output, session) {
       task_info$status <- "failed"
       task_info$message <- e$message
       write_json(task_info, task_json, auto_unbox = TRUE, pretty = TRUE)
-      writeLines(paste0("[", Sys.time(), "] FUTURE ERROR: ", e$message), file.path(io_dir, "log.txt"), append = TRUE)
+      cat(paste0("[", Sys.time(), "] Starting analysis\n"), file = log_file, append = TRUE)
       showNotification("Background job failed", type = "error")
     })
   })
